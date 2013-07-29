@@ -1,8 +1,4 @@
-'''
-Created on Jul 28, 2013
-
-@author: hakan
-'''
+#!/usr/bin/env python
 import errno
 import sys
 import traceback
@@ -73,10 +69,10 @@ class WifiScanner:
         except ValueError:
             pass
 
-    def notify(self, modifier=None):
+    def notify(self, packet, modifier=None):
         for listener in self.listeners:
             if modifier != listener:
-                listener.update(self)
+                listener.update(packet)
     
     def apply_filter(self, packet):
         try:
@@ -89,21 +85,7 @@ class WifiScanner:
 
             # Track AP and STA
             if packet.haslayer(Dot11):
-#                 
-#                 ap = None
-#                 if packet.haslayer(Dot11Beacon):
-#                     ap = self._update_access_points(packet)
-# 
-#                 elif any(packet.haslayer(layer) for layer in [Dot11ProbeReq, Dot11ProbeResp, Dot11Auth]):
-#                     ap = self._update_access_points(packet)
-#                     self._update_stations(packet)
-# 
-#                 elif packet[Dot11].hasflag('type', 'Data'):
-#                     ap_bssid = packet[Dot11].ap_bssid()
-#                     if ap_bssid in self.access_points:
-#                         self.access_points[ap_bssid].data_count += 1
-
-                Printer.write("Dot11 %s" % packet[Dot11])
+                self.notify(packet)
                 return True
 
             # That's unexpected.  print for debugging
@@ -115,17 +97,9 @@ class WifiScanner:
             return False
 
     def do_scan(self):
-        timeout = self.options.timeout
         sniff(iface=self.options.iface,
               store=False,
-              timeout=timeout,
               lfilter=self.apply_filter)
-        if timeout:
-            self.options.channel = ((self.options.channel + 3) % self.options.max_channel) + 1
-            self.set_channel(self.options.channel)
-            return True
-        else:
-            return False
 
     def scan(self):
         while True:
@@ -147,8 +121,12 @@ class WifiScanner:
                     raise
 
 class ConsolePrinter:
-    def update(self):
-        Printer.write('something'.format())
+    def update(self, packet):
+        Printer.write("%s > %s type:%2.2s/%2.2s signal/antenna:%4.4s/%s (%s)" % (packet[Dot11].addr2, packet[Dot11].addr1, 
+                                            packet[Dot11].type, packet[Dot11].subtype, 
+                                            packet[RadioTap].dBm_AntSignal, packet[RadioTap].Antenna,
+                                            packet[Dot11].essid()
+                                            ))
         
 def main():
 
@@ -161,10 +139,6 @@ def main():
             scanner.scan()
         except Exception, e:
             Printer.exception(e)
-
-        # Run with or without curses support, but finish in either case by printing a complete report
-        if scanner:
-            scanner.print_results()
 
     except Exception, e:
         sys.stderr.write(repr(e))
