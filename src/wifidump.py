@@ -2,7 +2,8 @@
 import errno
 import sys
 import traceback
-
+import sqlite3
+conn = sqlite3.connect('beacons.db')
 from printer import Printer
 from we import WirelessExtension
 from optparse import OptionParser
@@ -122,11 +123,18 @@ class WifiScanner:
 
 class ConsolePrinter:
     def update(self, packet):
+        c = conn.cursor()
+
+        c.execute("INSERT INTO frames (mac, ap_mac, type, signal, ssid) VALUES (\"%s\", \"%s\", \"%s\", \"%s\", \"%s\")" % (packet[Dot11].addr1, packet[Dot11].addr2,
+                                            packet[Dot11].type,
+                                            packet[RadioTap].dBm_AntSignal,
+                                            packet[Dot11].essid()
+                                            ))
+	conn.commit();
         Printer.write("%s > %s type:%2.2s/%2.2s signal/antenna:%4.4s/%s (%s)" % (packet[Dot11].addr2, packet[Dot11].addr1, 
                                             packet[Dot11].type, packet[Dot11].subtype, 
                                             packet[RadioTap].dBm_AntSignal, packet[RadioTap].Antenna,
-                                            packet[Dot11].essid()
-                                            ))
+                                            packet[Dot11].essid()))
         
 def main():
 
